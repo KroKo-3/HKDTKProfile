@@ -52,6 +52,9 @@ textarea{min-height:100px;resize:vertical;line-height:1.5}
 .actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:14px 0}
 button{min-height:47px;border:0;border-radius:11px;padding:11px 12px;font:inherit;font-size:15px;font-weight:750;cursor:pointer}
 button.primary{background:#176c9c;color:#fff;grid-column:1/-1}
+.actions .post-share-btn{display:block;grid-column:1/-1;background:#1d9bf0;color:#fff;box-shadow:0 2px 7px rgba(29,155,240,.18)}
+.actions .post-share-btn[hidden],.actions .post-share-status[hidden]{display:none}
+.actions .post-share-status{grid-column:1/-1;margin:0;padding:10px 12px;border-radius:10px;background:#eef7fc;color:#31566d;font-size:12px;line-height:1.55;text-align:center}
 button.secondary{background:#e8eef4;color:#263544}
 button:active{transform:translateY(1px)}
 .preview-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
@@ -480,6 +483,8 @@ button:focus-visible,.theme-card:focus-visible{outline:3px solid rgba(226,137,13
     <button class="secondary" id="exampleBtn" type="button">入力例を読み込む</button>
     <button class="secondary" id="resetBtn" type="button">入力をクリア</button>
     <button class="primary" id="saveBtn" type="button">プロフィール画像をPNG保存</button>
+    <button class="post-share-btn" id="postShareBtn" type="button" hidden>Xの投稿画面を開く</button>
+    <p class="post-share-status" id="postShareStatus" role="status" aria-live="polite" hidden>PNG画像を保存しました。下のボタンからXの投稿画面を開き、保存した画像を添付してください。</p>
   </div>
 </main>
 <script>
@@ -1794,15 +1799,45 @@ setupRatioPicker();
 updateGenderOtherField();
 document.getElementById('exampleBtn').addEventListener('click',loadExample);
 document.getElementById('resetBtn').addEventListener('click',()=>{ if(confirm('入力内容をすべて消去しますか？')) resetAll(); });
+// SNS共有用の投稿文。サービス名は正式名称、作成物は「ぐりぐらプロフィール」と表記します。
+const GURIGURA_POST_TEXT = 'ぐりぐらプロフィールメーカーで、ぐりぐらプロフを作ってみたよ！\n\n使ったサイトはこちら👇\nhttps://kroko-3.github.io/KRKPresents/\n#ぐりとぐらのプロフィール\n#くすぐり\n#ぐり\n#ぐら\n#フェチ';
+let latestPngBlob = null;
+const postShareBtn = document.getElementById('postShareBtn');
+const postShareStatus = document.getElementById('postShareStatus');
+
 document.getElementById('saveBtn').addEventListener('click',async()=>{
   await refreshPreviewWithFont();
   draw();
   canvas.toBlob(blob=>{
     if(!blob) { alert('画像を作成できませんでした。ブラウザを更新して再度お試しください。'); return; }
+    latestPngBlob = blob;
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');a.href=url;a.download='gurigura-profile.png';document.body.appendChild(a);a.click();a.remove();
     setTimeout(()=>URL.revokeObjectURL(url),1500);
+    postShareBtn.hidden=false;
+    postShareStatus.hidden=false;
+    postShareBtn.scrollIntoView({behavior:'smooth',block:'nearest'});
   },'image/png');
+});
+
+postShareBtn.addEventListener('click',()=>{
+  if(!latestPngBlob){
+    alert('先に「プロフィール画像をPNG保存」を押してください。');
+    return;
+  }
+
+  // Xの投稿作成画面を直接開き、投稿文を入力済みにします。
+  // WebサイトからXの投稿画面へ画像ファイルを自動添付することはできないため、
+  // 先に保存した gurigura-profile.png はX側で手動添付してもらいます。
+  const xPostUrl='https://x.com/intent/tweet?text='+encodeURIComponent(GURIGURA_POST_TEXT);
+  const link=document.createElement('a');
+  link.href=xPostUrl;
+  link.target='_blank';
+  link.rel='noopener noreferrer';
+  link.style.display='none';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 });
 // 最初に詳細欄と内蔵地図を準備し、外部通信や原本画像の読み込み完了を待たずに表示します。
 try{
